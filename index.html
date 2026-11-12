@@ -543,16 +543,18 @@ footer .fine { grid-column: 1 / -1; border-top: 1px solid var(--line); padding-t
     mask: '<path d="M4 6c3 1 13 1 16 0v5a8 8 0 0 1-16 0z"/><path d="M9 11h.01M15 11h.01M9.5 15a3.5 3.5 0 0 0 5 0"/>',
     ghost: '<path d="M6 20V10a6 6 0 0 1 12 0v10l-2-1.5-2 1.5-2-1.5-2 1.5-2-1.5z"/><path d="M10 10h.01M14 10h.01"/>',
     lotus: '<path d="M12 20c-4 0-8-2-9-6 3 0 6 1 9 4 3-3 6-4 9-4-1 4-5 6-9 6z"/><path d="M12 18c-2-3-2-8 0-12 2 4 2 9 0 12z"/>',
+    spark: '<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/>',
+    film: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 4v16M17 4v16M3 9h4M3 15h4M17 9h4M17 15h4"/>',
     grid: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
   };
   const CATS = [
     { key: "new", label: "Шинээр нэмэгдсэн", icon: "fire", c: "#ff4d4d" },
+    { key: "Хятад", label: "Хятад кино", icon: "lotus", c: "#d946ef" },
+    { key: "AI кино", label: "AI кино", icon: "spark", c: "#22d3ee" },
+    { key: "Адал явдалт", label: "Адал явдалт", icon: "compass", c: "#a855f7" },
+    { key: "18+", label: "18+", icon: "mask", c: "#f43f5e" },
+    { key: "movie", label: "Бүх кино", icon: "film", c: "#f59e0b" },
     { key: "series", label: "Цуврал", icon: "tv", c: "#3b82f6" },
-    { key: "Адал явдал", label: "Адал явдал", icon: "compass", c: "#a855f7" },
-    { key: "Романтик", label: "Романтик", icon: "heart", c: "#ec4899" },
-    { key: "Триллер", label: "Триллер", icon: "mask", c: "#8b5cf6" },
-    { key: "Аймшиг", label: "Аймшиг", icon: "ghost", c: "#94a3b8" },
-    { key: "Ази цуврал", label: "Ази цуврал", icon: "lotus", c: "#d946ef" },
     { key: "all", label: "Бүх ангилал", icon: "grid", c: "#38bdf8" },
   ];
   const svg = (k) => `<svg viewBox="0 0 24 24" aria-hidden="true">${ICON[k]}</svg>`;
