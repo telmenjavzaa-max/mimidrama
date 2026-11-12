@@ -116,6 +116,11 @@ Deno.serve(async (req: Request) => {
       return new Response("SUCCESS", { status: 200, headers: CORS });
     }
 
+    // ---- Холболт шалгах (нууц мэдээлэл буцаахгүй) ----
+    if (url.searchParams.get("ping")) {
+      try { await qpayToken(); return json({ qpay: "ok" }); } catch (e) { return json({ qpay: "error", detail: String((e as Error).message).replace(/Basic \S+/g, "") }, 502); }
+    }
+
     if (req.method !== "POST") return json({ error: "method" }, 405);
     const user = await currentUser(req);
     if (!user) return json({ error: "Нэвтэрнэ үү" }, 401);
