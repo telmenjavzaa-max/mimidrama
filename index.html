@@ -145,6 +145,15 @@ nav.mob { display: none; }
 .card:hover .poster .play { opacity: 1; }
 .badge { position: absolute; top: 8px; right: 8px; z-index: 3; font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 7px; background: linear-gradient(180deg, var(--red), var(--red-2)); color: #fff; box-shadow: 0 4px 12px -4px #ff2d55; }
 .badge.soon { background: #000b; box-shadow: none; }
+.badge.adult { left: 8px; right: auto; background: #000c; border: 1px solid #ff2d55; box-shadow: none; }
+.poster.locked img { filter: blur(18px) brightness(.55); transform: scale(1.15); }
+.poster.locked::after { content: "18+"; position: absolute; inset: 0; z-index: 2; display: grid; place-items: center; font: 700 30px/1 var(--title, sans-serif); color: #fff; text-shadow: 0 4px 18px #000; }
+#ageDlg { width: min(420px, calc(100vw - 32px)); }
+.age { padding: 28px 24px 24px; display: grid; gap: 14px; text-align: center; }
+.age .ring { width: 74px; height: 74px; margin: 0 auto; border-radius: 50%; display: grid; place-items: center; border: 3px solid var(--red); font: 700 24px/1 var(--title, sans-serif); }
+.age h2 { margin: 0; font-family: var(--title); font-weight: 400; font-size: 22px; }
+.age p { margin: 0; color: #d9d2e2; font-size: 14px; }
+.age .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .tag-l { position: absolute; top: 8px; left: 8px; z-index: 3; font-size: 10.5px; font-weight: 600; padding: 3px 8px; border-radius: 7px; background: #000a; color: #fff; }
 .poster .info { position: absolute; left: 0; right: 0; bottom: 0; z-index: 2; padding: 28px 10px 9px; background: linear-gradient(0deg, #000d, transparent); font-size: 11.5px; font-weight: 500; color: #eee; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .card .name { font-weight: 600; font-size: 14px; line-height: 1.3; color: var(--fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -436,6 +445,15 @@ footer .fine { grid-column: 1 / -1; border-top: 1px solid var(--line); padding-t
   <div id="movieBody"></div>
 </dialog>
 
+<dialog id="ageDlg" aria-labelledby="ageTitle">
+  <div class="age">
+    <div class="ring" aria-hidden="true">18+</div>
+    <h2 id="ageTitle">Та 18 нас хүрсэн үү?</h2>
+    <p>Энэ контент зөвхөн <b>18 ба түүнээс дээш</b> насны хүнд зориулагдсан. Үргэлжлүүлснээр та 18 нас хүрсэн гэдгээ баталж байна.</p>
+    <div class="row"><button class="btn" type="button" id="ageNo">Үгүй</button><button class="btn primary" type="button" id="ageYes">Тийм, 18+ нас</button></div>
+  </div>
+</dialog>
+
 <dialog id="authDlg" aria-labelledby="aTitle">
   <div class="auth">
     <img class="logo" src="img/logo-header.png" alt="MimiDrama">
@@ -539,6 +557,21 @@ footer .fine { grid-column: 1 / -1; border-top: 1px solid var(--line); padding-t
   ];
   const svg = (k) => `<svg viewBox="0 0 24 24" aria-hidden="true">${ICON[k]}</svg>`;
   const tagsOf = (m) => [m.genre, ...(m.tags || [])].filter(Boolean);
+  // ---------- 18+ насны баталгаажуулалт ----------
+  const is18 = (m) => !!m && (/18/.test(String(m.age_rating || "")) || (m.tags || []).some((t) => /18\+/.test(t)));
+  const AGE_KEY = "mm_age_ok";
+  const ageConfirmed = () => { try { const v = +localStorage.getItem(AGE_KEY); return v && Date.now() - v < 864e5; } catch { return state.ageOk === true; } };
+  function confirmAge() {
+    if (ageConfirmed()) return Promise.resolve(true);
+    const dlg = document.getElementById("ageDlg");
+    return new Promise((resolve) => {
+      const done = (ok) => { dlg.removeEventListener("cancel", onCancel); $("#ageYes").onclick = $("#ageNo").onclick = null; if (dlg.open) dlg.close(); if (ok) { state.ageOk = true; try { localStorage.setItem(AGE_KEY, String(Date.now())); } catch {} document.querySelectorAll(".poster.locked").forEach((el) => el.classList.remove("locked")); } else toast("18 нас хүрээгүй бол энэ контентыг үзэх боломжгүй"); resolve(ok); };
+      const onCancel = (e) => { e.preventDefault(); done(false); };
+      dlg.addEventListener("cancel", onCancel);
+      $("#ageYes").onclick = () => done(true); $("#ageNo").onclick = () => done(false);
+      dlg.showModal();
+    });
+  }
   const isNew = (m) => Date.now() - new Date(m.created_at || 0).getTime() < 21 * 864e5;
   const norm = (v) => String(v || "").toLowerCase().replace(/ө/g, "о").replace(/ү/g, "у").replace(/ё/g, "е");
   function matchCat(m, key) {
@@ -555,7 +588,8 @@ footer .fine { grid-column: 1 / -1; border-top: 1px solid var(--line); padding-t
   const playIc = '<svg viewBox="0 0 24 24"><path d="M7 4v16l13-8z"/></svg>';
   function posterHTML(m, withBadges = true, priority = false) {
     const badge = !withBadges ? "" : !m.has_video ? `<span class="badge soon">Удахгүй</span>` : isNew(m) ? `<span class="badge">Шинэ</span>` : "";
-    return `<div class="poster" style="--h1:${+m.hue1 || 340};--h2:${+m.hue2 || 260}">
+    return `<div class="poster${is18(m) && !ageConfirmed() ? " locked" : ""}" style="--h1:${+m.hue1 || 340};--h2:${+m.hue2 || 260}">
+      ${is18(m) ? `<span class="badge adult">18+</span>` : ""}
       <div class="p-title">${esc(m.title)}</div>
       ${m.poster_url ? `<img src="${esc(m.poster_url)}" alt="" width="400" height="600" ${priority ? 'fetchpriority="high"' : 'loading="lazy"'} decoding="async" onerror="this.remove()">` : ""}
       ${badge}
@@ -607,7 +641,7 @@ footer .fine { grid-column: 1 / -1; border-top: 1px solid var(--line); padding-t
   const byTop = (a, b) => (b.views || 0) - (a.views || 0) || byNew(a, b);
   const BRAND_IMG = cfg.BRAND_HERO || "";
   function heroItems() {
-    return (BRAND_IMG ? [{ id: "brand", brand: true, poster_url: BRAND_IMG }] : []).concat([...state.movies].filter((m) => m.backdrop_url || m.poster_url).sort((a, b) => (b.featured === true) - (a.featured === true) || byNew(a, b)).slice(0, 6));
+    return (BRAND_IMG ? [{ id: "brand", brand: true, poster_url: BRAND_IMG }] : []).concat([...state.movies].filter((m) => (m.backdrop_url || m.poster_url) && !is18(m)).sort((a, b) => (b.featured === true) - (a.featured === true) || byNew(a, b)).slice(0, 6));
   }
   function renderHero() {
     const items = heroItems();
@@ -720,6 +754,7 @@ footer .fine { grid-column: 1 / -1; border-top: 1px solid var(--line); padding-t
   // ---------- Дэлгэрэнгүй ----------
   async function openMovie(id, playing = null) {
     const m = state.movies.find((x) => x.id === id); if (!m) return;
+    if (is18(m) && !(await confirmAge())) return;
     if (!playing) track("ViewContent", { content_ids: [String(m.id)], content_name: m.title, content_type: "product" });
     state.current = m;
     const eps = m.kind === "series" ? await loadEpisodes(m.id) : [];
@@ -845,6 +880,7 @@ footer .fine { grid-column: 1 / -1; border-top: 1px solid var(--line); padding-t
 
   async function play(id) {
     const m = state.movies.find((x) => x.id === id); if (!m || !m.has_video) return;
+    if (is18(m) && !(await confirmAge())) return;
     if (m.kind === "series") {
       const eps = await loadEpisodes(id); const pr = state.progress.get(id);
       const ep = (pr?.episode_id && eps.find((e) => e.id === pr.episode_id)) || eps[0];
@@ -860,12 +896,14 @@ footer .fine { grid-column: 1 / -1; border-top: 1px solid var(--line); padding-t
   }
   async function playTrailer(id) {
     const m = state.movies.find((x) => x.id === id); if (!m?.trailer_url) return;
+    if (is18(m) && !(await confirmAge())) return;
     await stopPlayer();
     openMovie(id, { url: m.trailer_url, trailer: true });
   }
   async function playEpisode(epId, movieIdHint) {
     const movieId = movieIdHint || state.current?.id;
     const m = state.movies.find((x) => x.id === movieId); if (!m) return;
+    if (is18(m) && !(await confirmAge())) return;
     if (!state.user) { state.pendingPlay = { id: movieId, ep: epId }; openAuth("Үзэхийн тулд нэвтэрнэ үү."); return; }
     const eps = await loadEpisodes(movieId);
     const i = eps.findIndex((e) => e.id === epId); if (i < 0) return;
