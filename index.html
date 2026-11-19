@@ -584,6 +584,7 @@ footer .fine { grid-column: 1 / -1; border-top: 1px solid var(--line); padding-t
     if (key === "new") return isNew(m);
     if (key === "series") return m.kind === "series";
     if (key === "movie") return m.kind !== "series";
+    if (key === "18+") return is18(m);
     return tagsOf(m).some((t) => norm(t) === norm(key));
   }
 

@@ -211,7 +211,7 @@ dialog::backdrop { background: #000c; }
       <div style="display:grid;gap:12px;min-width:0">
         <div class="row">
           <label class="f">Төрөл<select id="eKind"><option value="movie">Кино</option><option value="series">Цуврал</option></select></label>
-          <label class="f">Насны ангилал<input id="eAge" maxlength="8" placeholder="13+, 16+, 18+"></label>
+          <label class="f">Насны ангилал<select id="eAge"><option value="">Бүх нас</option><option value="13+">13+</option><option value="16+">16+</option><option value="18+">🔞 18+ (насанд хүрэгчдэд)</option></select></label>
         </div>
         <label class="f">Нэр<input id="eTitleIn" required maxlength="120"></label>
         <div class="row">
@@ -307,7 +307,7 @@ dialog::backdrop { background: #000c; }
   const fmt = (n) => Number(n || 0).toLocaleString("en-US") + "₮";
   const dt = (s) => s ? new Date(s).toLocaleString("mn-MN", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—";
   const state = { movies: [], videos: {}, plans: [], users: [], editing: null, posterFile: null, backFile: null, backClear: false, tags: [], eps: [], epVideos: {} };
-  const CAT_TAGS = ["Адал явдал", "Романтик", "Триллер", "Аймшиг", "Ази цуврал", "Түүхэн", "Драм", "Инээдмийн", "Тулаант", "Уран зөгнөлт", "Хүүхэд", "Баримтат"];
+  const CAT_TAGS = ["18+", "Хятад", "AI кино", "Адал явдалт", "Адал явдал", "Романтик", "Триллер", "Аймшиг", "Ази цуврал", "Түүхэн", "Драм", "Инээдмийн", "Тулаант", "Уран зөгнөлт", "Хүүхэд", "Баримтат"];
 
   function toast(t) { const d = document.createElement("div"); d.className = "toast"; d.textContent = t; d.setAttribute("role", "status"); document.body.appendChild(d); setTimeout(() => d.remove(), 2400); }
   function gate(title, text, showLogin) { $("#gate").hidden = false; $("#app").hidden = true; $("#gateTitle").textContent = title; $("#gateText").textContent = text || ""; $("#gateLogin").hidden = !showLogin; $("#gatePhone").hidden = !showLogin || !cfg.PHONE_LOGIN; }
@@ -396,13 +396,15 @@ dialog::backdrop { background: #000c; }
     const all = [...new Set([...CAT_TAGS, ...state.tags])];
     $("#eTags").innerHTML = all.map((t) => `<button type="button" data-tag="${esc(t)}" aria-pressed="${state.tags.includes(t)}">${esc(t)}</button>`).join("");
   }
-  $("#eTags").addEventListener("click", (e) => { const b = e.target.closest("[data-tag]"); if (!b) return; const t = b.dataset.tag; state.tags = state.tags.includes(t) ? state.tags.filter((x) => x !== t) : [...state.tags, t]; renderTags(); });
+  $("#eTags").addEventListener("click", (e) => { const b = e.target.closest("[data-tag]"); if (!b) return; const t = b.dataset.tag; state.tags = state.tags.includes(t) ? state.tags.filter((x) => x !== t) : [...state.tags, t]; if (t === "18+") $("#eAge").value = state.tags.includes("18+") ? "18+" : ""; renderTags(); });
+  // 18+ сонголт ↔ "18+" ангилал (сайтын 18+ хавтанд гарна)
+  $("#eAge").addEventListener("change", () => { const on = $("#eAge").value === "18+"; state.tags = on ? [...new Set([...state.tags, "18+"])] : state.tags.filter((x) => x !== "18+"); renderTags(); });
   $("#eKind").addEventListener("change", kindUI);
   function openEdit(m, kind) {
     state.editing = m || null; state.posterFile = null; state.backFile = null; state.backClear = false;
     $("#eKind").value = m?.kind || kind || "movie";
     $("#eTitle").textContent = m ? ($("#eKind").value === "series" ? "Цуврал засах" : "Кино засах") : ($("#eKind").value === "series" ? "Шинэ цуврал" : "Шинэ кино");
-    $("#eAge").value = m?.age_rating || "";
+    { const a = m?.age_rating || "", sel = $("#eAge"); if (a && ![...sel.options].some((o) => o.value === a)) sel.add(new Option(a, a)); sel.value = /18/.test(a) ? "18+" : a; }
     $("#eOngoing").checked = !!m?.ongoing;
     state.tags = [...(m?.tags || [])]; renderTags();
     $("#eBackImg").hidden = !m?.backdrop_url; $("#eBackImg").src = m?.backdrop_url || ""; $("#eBackClear").hidden = !m?.backdrop_url; $("#eBackFile").value = "";
@@ -534,7 +536,7 @@ dialog::backdrop { background: #000c; }
         featured: $("#eFeatured").checked,
         kind: $("#eKind").value,
         age_rating: $("#eAge").value.trim() || null,
-        tags: state.tags,
+        tags: $("#eAge").value === "18+" ? [...new Set([...state.tags, "18+"])] : state.tags.filter((x) => x !== "18+"),
         trailer_url: trailer || null,
         ongoing: $("#eKind").value === "series" && $("#eOngoing").checked,
       };
