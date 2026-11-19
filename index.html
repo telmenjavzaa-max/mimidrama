@@ -927,24 +927,28 @@ footer .fine { grid-column: 1 / -1; border-top: 1px solid var(--line); padding-t
 
   // ---------- Эрх, багц ----------
   const fmt = (n) => Number(n).toLocaleString("mn-MN").replace(/ /g, ",") + "₮";
-  const hasAccess = (movieId) => state.ents.some((e) => new Date(e.expires_at).getTime() > Date.now() && (e.movie_id == null || e.movie_id === movieId));
+  // 18+ кино зөвхөн 18+ багцаар; энгийн багц 18+ кинод хамаарахгүй
+  const scopeOf = (e) => e.scope || "all";
+  const hasAccess = (movieId) => { const ad = is18(state.movies.find((x) => x.id === movieId)); return state.ents.some((e) => new Date(e.expires_at).getTime() > Date.now() && (e.movie_id === movieId || (e.movie_id == null && scopeOf(e) === (ad ? "adult" : "all")))); };
   async function loadAccess() {
     state.ents = []; state.isAdmin = false;
     if (sb && state.user) {
-      const [{ data }, adm] = await Promise.all([sb.from("entitlements").select("movie_id,expires_at").gt("expires_at", new Date().toISOString()), sb.rpc("is_admin")]);
+      const [{ data }, adm] = await Promise.all([sb.from("entitlements").select("movie_id,expires_at,scope").eq("user_id", state.user.id).gt("expires_at", new Date().toISOString()), sb.rpc("is_admin")]);
       state.ents = data || []; state.isAdmin = adm?.data === true;
     }
-    const sub = state.ents.filter((e) => e.movie_id == null).sort((a, b) => b.expires_at.localeCompare(a.expires_at))[0];
+    const sub = state.ents.filter((e) => e.movie_id == null && scopeOf(e) === "all").sort((a, b) => b.expires_at.localeCompare(a.expires_at))[0];
     $("#access").hidden = !sub && !state.isAdmin;
     $("#adminLink").hidden = !state.isAdmin;
     $("#access").textContent = state.isAdmin ? "Админ" : sub ? "Багц: " + new Date(sub.expires_at).toLocaleDateString("mn-MN") + " хүртэл" : "";
   }
   async function loadPlans() {
     if (!sb) return;
-    const { data } = await sb.from("plans").select("code,title,amount,old_amount,hours,kind,sort,badge,description").eq("active", true);
+    const { data } = await sb.from("plans").select("code,title,amount,old_amount,hours,kind,sort,badge,description,scope").eq("active", true);
     state.plans = {}; (data || []).forEach((p) => { state.plans[p.code] = p; });
   }
-  const subPlans = () => Object.values(state.plans).filter((p) => p.kind !== "rent").sort((a, b) => (a.sort ?? 0) - (b.sort ?? 0) || a.amount - b.amount);
+  const byPlanSort = (a, b) => (a.sort ?? 0) - (b.sort ?? 0) || a.amount - b.amount;
+  const subPlans = () => Object.values(state.plans).filter((p) => p.kind !== "rent" && (p.scope || "all") === "all").sort(byPlanSort);
+  const adultPlans = () => Object.values(state.plans).filter((p) => p.kind !== "rent" && p.scope === "adult").sort(byPlanSort);
   const rentPlan = () => Object.values(state.plans).find((p) => p.kind === "rent");
   const PAY = !!cfg.PAYMENTS_ENABLED;
   const planBtn = (p, movieId, title, price, sub) => `<button class="plan${p.badge ? " best" : ""}" data-buy="${esc(p.code)}" data-movie="${movieId ?? ""}" ${PAY ? "" : "disabled"}>
@@ -954,6 +958,15 @@ footer .fine { grid-column: 1 / -1; border-top: 1px solid var(--line); padding-t
   const soonNote = PAY ? "" : `<div class="soon-box">Төлбөрийн систем удахгүй нээгдэнэ. Тун удахгүй QPay-ээр төлөөд үзэх боломжтой болно.</div>`;
   function openPaywall(m) {
     stopPolling();
+    if (is18(m)) {
+      $("#payBody").innerHTML = `<h2 id="pTitle">${esc(m.title)} үзэх</h2>
+        <p class="note">🔞 18+ кинонууд зөвхөн <b>18+ багц</b>-аар үзэгдэнэ. Энгийн багц, түрээсэд хамаарахгүй.</p>${soonNote}
+        ${adultPlans().map((p) => planBtn(p, m.id, null, null, p.description || `Бүх 18+ кино · ${Math.round(p.hours / 24)} хоног`)).join("") || `<p class="note">18+ багц одоогоор алга.</p>`}
+        <div class="msg" id="payMsg" role="status"></div>`;
+      if ($("#movieDlg").open) $("#movieDlg").close();
+      if (!$("#payDlg").open) $("#payDlg").showModal();
+      return;
+    }
     const rent = rentPlan(), rentPrice = m.rent_price || rent?.amount;
     $("#payBody").innerHTML = `<h2 id="pTitle">${esc(m.title)} үзэх</h2>
       <p class="note">${m.kind === "series" ? "Бүх ангийг үзэхийн тулд багц эсвэл түрээс сонгоно уу." : "Багц эсвэл түрээс сонгоно уу."}</p>
@@ -969,7 +982,9 @@ footer .fine { grid-column: 1 / -1; border-top: 1px solid var(--line); padding-t
     if (PAY && !state.user) { openAuth("Багц авахын тулд эхлээд нэвтэрнэ үү."); return; }
     stopPolling();
     $("#payBody").innerHTML = `<h2 id="pTitle">Багц сонгох</h2><p class="note">Бүх кино, цувралыг хязгааргүй үзнэ.</p>${soonNote}
-      ${subPlans().map((p) => planBtn(p, null)).join("") || `<p class="note">Одоогоор идэвхтэй багц алга.</p>`}<div class="msg" id="payMsg" role="status"></div>`;
+      ${subPlans().map((p) => planBtn(p, null)).join("") || `<p class="note">Одоогоор идэвхтэй багц алга.</p>`}
+      ${adultPlans().length ? `<p class="note" style="margin-top:14px">🔞 <b>18+ багц</b> — тусдаа. Зөвхөн 18+ кинонууд орно, дээрх багцад 18+ орохгүй.</p>${adultPlans().map((p) => planBtn(p, null, null, null, p.description || `Бүх 18+ кино · ${Math.round(p.hours / 24)} хоног`)).join("")}` : ""}
+      <div class="msg" id="payMsg" role="status"></div>`;
     if (!$("#payDlg").open) $("#payDlg").showModal();
   }
   async function buy(plan, movieId) {

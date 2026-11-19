@@ -268,7 +268,7 @@ dialog::backdrop { background: #000c; }
     <h2 id="gTitle">Эрх олгох</h2>
     <p class="hint" id="gWho" style="margin:0"></p>
     <div class="row">
-      <label class="f">Эрхийн төрөл<select id="gKind"><option value="all">Бүх кино, цуврал (багц)</option><option value="one">Нэг кино / цуврал</option></select></label>
+      <label class="f">Эрхийн төрөл<select id="gKind"><option value="all">Бүх кино, цуврал (багц)</option><option value="adult">🔞 18+ багц (зөвхөн 18+ кино)</option><option value="one">Нэг кино / цуврал</option></select></label>
       <label class="f" id="gMovieWrap" hidden>Кино / цуврал<select id="gMovie"></select></label>
     </div>
     <div class="row">
@@ -618,7 +618,7 @@ dialog::backdrop { background: #000c; }
     const { data, error } = await sb.rpc("admin_user_entitlements", { p_user: grantUser.id });
     if (error) { $("#gEnts").textContent = "Ачаалж чадсангүй: " + error.message; return; }
     $("#gEnts").innerHTML = (data || []).length ? `<div class="table-wrap"><table style="min-width:0"><tbody>${data.map((e) => `
-      <tr><td>${e.movie_id ? esc(e.movie_title || "Кино #" + e.movie_id) : "<b>Бүх кино (багц)</b>"}</td><td class="num">${dd(e.expires_at)} хүртэл</td><td><span class="pill">${esc(e.source)}</span>${e.note ? ` <span class="hint">${esc(e.note)}</span>` : ""}</td>
+      <tr><td>${e.movie_id ? esc(e.movie_title || "Кино #" + e.movie_id) : `<b>${esc(e.movie_title || "Бүх кино (багц)")}</b>`}</td><td class="num">${dd(e.expires_at)} хүртэл</td><td><span class="pill">${esc(e.source)}</span>${e.note ? ` <span class="hint">${esc(e.note)}</span>` : ""}</td>
       <td><button type="button" class="btn sm danger" data-revoke="${e.id}">Цуцлах</button></td></tr>`).join("")}</tbody></table></div>` : "Идэвхтэй эрх алга.";
   }
   function openGrant(u) {
@@ -647,7 +647,7 @@ dialog::backdrop { background: #000c; }
     if (!(days >= 1 && days <= 3650)) { msg.className = "msg err"; msg.textContent = "Хоногийн тоог 1–3650 хооронд бичнэ үү."; return; }
     const movie = $("#gKind").value === "one" ? +$("#gMovie").value : null;
     $("#gSave").disabled = true; msg.className = "msg"; msg.textContent = "Олгож байна…";
-    const { data, error } = await sb.rpc("admin_grant", { p_user: grantUser.id, p_movie: movie, p_days: days, p_note: $("#gNote").value.trim() || null });
+    const { data, error } = await sb.rpc("admin_grant", { p_user: grantUser.id, p_movie: movie, p_days: days, p_note: $("#gNote").value.trim() || null, p_scope: $("#gKind").value === "adult" ? "adult" : "all" });
     $("#gSave").disabled = false;
     if (error) { msg.className = "msg err"; msg.textContent = "Олгож чадсангүй: " + error.message; return; }
     msg.className = "msg ok"; msg.textContent = `Эрх олгогдлоо: ${dd(data)} хүртэл.`;
@@ -694,7 +694,7 @@ dialog::backdrop { background: #000c; }
   function planForm(p) {
     const isNew = !p.code, rent = p.kind === "rent";
     return `<form class="plan-card" data-plan="${esc(p.code || "")}" ${p.active === false ? 'style="opacity:.6"' : ""}>
-      <h3>${rent ? "Нэг кино түрээс (суурь үнэ)" : isNew ? "Шинэ багц" : esc(p.title)}</h3>
+      <h3>${rent ? "Нэг кино түрээс (суурь үнэ)" : isNew ? "Шинэ багц" : esc(p.title)}${p.scope === "adult" ? ' <span class="pill warn">🔞 18+</span>' : ""}</h3>
       <label class="f">Нэр<input name="title" value="${esc(p.title || "")}" maxlength="60" required placeholder="30 хоногийн багц"></label>
       <div class="row">
         <label class="f">Үнэ (₮)<input name="amount" type="number" min="1" step="1" value="${p.amount ?? ""}" required></label>
@@ -710,7 +710,8 @@ dialog::backdrop { background: #000c; }
       <label class="f">Шошго (заавал биш)<input name="badge" value="${esc(p.badge || "")}" maxlength="30" placeholder="Нээлтийн урамшуулал"></label>
       <label class="f">Тайлбар<textarea name="description" maxlength="200" placeholder="Бүх киног 30 хоног үзнэ">${esc(p.description || "")}</textarea></label>`}
       <div class="actions" style="justify-content:space-between;align-items:center">
-        <label class="check"><input type="checkbox" name="active" ${p.active !== false ? "checked" : ""}> Идэвхтэй</label>
+        <span style="display:grid;gap:4px"><label class="check"><input type="checkbox" name="active" ${p.active !== false ? "checked" : ""}> Идэвхтэй</label>
+        ${rent ? "" : `<label class="check" title="Зөвхөн 18+ кинонууд орно; энгийн багцад 18+ орохгүй"><input type="checkbox" name="adult" ${p.scope === "adult" ? "checked" : ""}> 🔞 18+ багц (тусдаа)</label>`}</span>
         <span style="display:flex;gap:8px">
           ${!isNew && !rent ? `<button type="button" class="btn danger" data-del-plan="${esc(p.code)}">Устгах</button>` : ""}
           ${isNew ? `<button type="button" class="btn" data-cancel-plan>Болих</button>` : ""}
@@ -748,7 +749,7 @@ dialog::backdrop { background: #000c; }
       sort: num("sort") ?? 0,
       active: !!fd.get("active"),
     };
-    if (!rent) { upd.badge = String(fd.get("badge") || "").trim() || null; upd.description = String(fd.get("description") || "").trim() || null; }
+    if (!rent) { upd.badge = String(fd.get("badge") || "").trim() || null; upd.description = String(fd.get("description") || "").trim() || null; upd.scope = fd.get("adult") ? "adult" : "all"; }
     if (!upd.title || !(upd.amount > 0) || !(upd.hours > 0)) { toast("Нэр, үнэ, хугацааг зөв бөглөнө үү"); return; }
     if (upd.old_amount != null && upd.old_amount <= upd.amount) { toast("Хуучин үнэ одоогийн үнээс их байх ёстой (эсвэл хоосон орхино)"); return; }
     let error;
