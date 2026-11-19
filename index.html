@@ -751,7 +751,8 @@ footer .fine { grid-column: 1 / -1; border-top: 1px solid var(--line); padding-t
     $("#menu").hidden = true; $("#catMenu").hidden = true;
     render(); scrollTo({ top: 0, behavior: "smooth" });
   }
-  function openCat(key) {
+  async function openCat(key) {
+    if (key === "18+" && !(await confirmAge())) return;
     if (key === "new") return setView("new");
     if (key === "series") return setView("series");
     setView("all", key);
@@ -1097,7 +1098,7 @@ footer .fine { grid-column: 1 / -1; border-top: 1px solid var(--line); padding-t
     if ((el = t("[data-fav]"))) { toggleFav(+el.dataset.fav); return; }
     if ((el = t("[data-season]"))) { state.season = +el.dataset.season; openMovie(state.current.id); return; }
     if ((el = t("[data-cat]"))) { openCat(el.dataset.cat); return; }
-    if ((el = t("[data-chip]"))) { state.cat = el.dataset.chip; if (state.view === "home" || state.view === "new" || state.view === "top") state.view = "all"; render(); return; }
+    if ((el = t("[data-chip]"))) { const ck = el.dataset.chip; if (ck === "18+" && !ageConfirmed()) { confirmAge().then((ok) => { if (ok) { state.cat = ck; if (["home", "new", "top"].includes(state.view)) state.view = "all"; render(); } }); return; } state.cat = ck; if (state.view === "home" || state.view === "new" || state.view === "top") state.view = "all"; render(); return; }
     if ((el = t("[data-view]"))) { e.preventDefault(); setView(el.dataset.view); return; }
     if ((el = t("[data-more]"))) { const [v, c] = el.dataset.more.split(":"); v === "cat" ? openCat(c) : setView(v); return; }
     if ((el = t("[data-dot]"))) { showSlide(+el.dataset.dot); startHero(); return; }
