@@ -197,6 +197,15 @@ main { padding-bottom: 56px; }
 
 /* ---------- Цонхнууд ---------- */
 dialog { border: 1px solid var(--line); background: var(--bg-2); color: var(--fg); border-radius: 18px; padding: 0; width: min(900px, calc(100vw - 24px)); max-height: calc(100vh - 32px); }
+/* Компьютерээс үзэхийг хориглох цонх */
+#mobDlg { width: min(460px, calc(100vw - 32px)); }
+.mob { padding: 32px 26px 28px; text-align: center; display: grid; justify-items: center; gap: 12px; }
+.mob-ic { width: 60px; height: 60px; border-radius: 50%; display: grid; place-items: center; background: linear-gradient(135deg, #ff2d55, #ff8a3d); color: #fff; }
+.mob-ic svg { width: 28px; height: 28px; fill: none; stroke: currentColor; stroke-width: 2; }
+.mob h2 { margin: 2px 0 0; font-size: 24px; }
+.mob p { margin: 0; color: var(--muted, #aaa); max-width: 360px; }
+.mob img { width: 168px; height: 168px; border-radius: 12px; background: #fff; padding: 8px; }
+.mob .btn { min-width: 140px; }
 dialog::backdrop { background: #000c; backdrop-filter: blur(4px); }
 #authDlg, #payDlg, #promoDlg { width: min(440px, calc(100vw - 32px)); }
 .close-x { position: absolute; top: 12px; right: 12px; z-index: 5; border: 0; background: #000a; width: 36px; height: 36px; border-radius: 50%; font-size: 19px; color: #fff; }
@@ -504,6 +513,14 @@ footer .fine { grid-column: 1 / -1; border-top: 1px solid var(--line); padding-t
     <div class="msg" id="authMsg" role="status"></div>
     <button class="btn ghost" type="button" data-close>Болих</button>
   </div>
+</dialog>
+
+<dialog id="mobDlg" aria-labelledby="mobTitle">
+  <div class="mob"><div class="mob-ic"><svg viewBox="0 0 24 24"><rect x="6" y="2" width="12" height="20" rx="2.5"/><path d="M11 18h2"/></svg></div>
+    <h2 id="mobTitle">Зөвхөн утаснаас үзнэ</h2>
+    <p>Кино, цувралыг зөвхөн гар утаснаас үзэх боломжтой. Утсаараа доорх QR кодыг уншуулж эсвэл <b>mimidrama.mn</b> руу орж, ижил бүртгэлээрээ нэвтэрнэ үү.</p>
+    <img id="mobQr" alt="Утсаар нээх QR код">
+    <button class="btn" id="mobOk">Ойлголоо</button></div>
 </dialog>
 
 <dialog id="payDlg" aria-labelledby="pTitle">
@@ -885,6 +902,16 @@ footer .fine { grid-column: 1 / -1; border-top: 1px solid var(--line); padding-t
     if (state.view === "home") renderRows();
   }
 
+  // Компьютерээс үзэхийг хориглоно (админаас бусад). Таблет, утас зөвшөөрөгдөнө.
+  const isMobileDevice = () => /Android|iPhone|iPad|iPod|Mobile|Opera Mini|IEMobile/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent));
+  function desktopBlocked(movieId) {
+    if (isMobileDevice() || state.isAdmin) return false;
+    const url = location.origin + "/?m=" + movieId;
+    $("#mobQr").src = "https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=0&data=" + encodeURIComponent(url);
+    const d = $("#mobDlg"); if (!d.open) d.showModal();
+    return true;
+  }
+  $("#mobOk").addEventListener("click", () => $("#mobDlg").close());
   async function play(id) {
     const m = state.movies.find((x) => x.id === id); if (!m || !m.has_video) return;
     if (is18(m) && !(await confirmAge())) return;
@@ -897,6 +924,7 @@ footer .fine { grid-column: 1 / -1; border-top: 1px solid var(--line); padding-t
     if (!state.user) { state.pendingPlay = { id }; openAuth("Кино үзэхийн тулд нэвтэрнэ үү."); return; }
     const { data } = await sb.from("movie_videos").select("video_url").eq("movie_id", id).maybeSingle();
     if (!data?.video_url) return openPaywall(m);
+    if (desktopBlocked(id)) return;
     sb.rpc("record_view", { p_movie: id });
     await stopPlayer();
     openMovie(id, { url: data.video_url });
@@ -919,6 +947,7 @@ footer .fine { grid-column: 1 / -1; border-top: 1px solid var(--line); padding-t
       if (hasAccess(movieId) || state.isAdmin) { toast("Энэ ангийн видео удахгүй нэмэгдэнэ"); return; }
       return openPaywall(m);
     }
+    if (desktopBlocked(movieId)) return;
     sb.rpc("record_view", { p_movie: movieId });
     await stopPlayer();
     state.season = eps[i].season;
